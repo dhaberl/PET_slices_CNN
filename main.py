@@ -5,8 +5,10 @@ import numpy as np
 import math
 import random
 from DataGenerator import DataGenerator
+from bayes_opt import BayesianOptimization
 import pandas as pd
 import time
+import datetime
 import argparse
 
 # Silent warning of Scipy.ndimage.zoom
@@ -199,21 +201,27 @@ def main():
     test_ratio = 0.15
     batch_size = 32
 
-    # Data augmentation parameters
-    da_parameters = {"width_shift": 20,
-                     "height_shift": 20,
-                     "rotation_range": 20,
-                     "horizontal_flip": 1,
-                     "vertical_flip": 1,
-                     "min_zoom": 0.5,
-                     "max_zoom": 1.5,
-                     "random_crop_size": 0.85,
-                     "random_crop_rate": 1,
-                     "center_crop_size": 0.85,
-                     "center_crop_rate": 1,
-                     "gaussian_filter_std": 2,
-                     "gaussian_filter_rate": 1
-                     }
+    n_random_exploration = 2    # Number of random exploration; sampling of function
+    n_bayes = 30                # Number of Bayesian Optimizations steps
+    alpha = 1                   # Handles the noise of the black box function; default: 1e-10.
+    acq = "ei"                  # Select acquisition function: either "ucb" (default), "ei" or "poi".
+    xi = 0.1                    # if acq == "ucb" use "kappa", else "xi". See Documentation.
+                                # "xi": prefer exploitation: 0.0, prefer exploration: 0.1
+
+    # Set parameter range
+    bounds = {"width_shift": (5, 20.),
+              "height_shift": (5, 20),
+              "rotation_range": (5, 20.),
+              "horizontal_flip": (1., 1.),
+              "vertical_flip": (1., 1.),
+              "min_zoom": (0.5, 1.),
+              "max_zoom": (1., 1.5),
+              "random_crop_size": (0.75, 1.),
+              "random_crop_rate": (1., 1.),
+              "center_crop_size": (0.75, 1.),
+              "center_crop_rate": (1., 1.),
+              "gaussian_filter_std": (0., 2.0),
+              "gaussian_filter_rate": (1., 1.)}
 
     # Get dimensions of one sample from training samples
     dims = get_dims(data_dir)
@@ -222,6 +230,14 @@ def main():
     labels_df = pd.read_csv(os.path.join(data_dir, "labels.csv"), sep=";", header=0)
     labels = dict(zip(labels_df.iloc[:, 0].tolist(), labels_df.iloc[:, 1].tolist()))
     n_classes = len(np.unique(labels_df[labels_df.columns[-1]].values))
+
+    # Split data into 2 sets: performance and optimization
+    partition = split_data(ids=list(labels.keys()), ratios={"performance": 0.5, "optimization": 0.5})
+
+    # Split optimization data into train-, validation- and test-set
+    partition_opt = split_data(ids=partition["optimization"], ratios={"train_opt": train_ratio,
+                                                                      "validation_opt": validation_ratio,
+                                                                      "test_opt": test_ratio})
 
     # Log: Initialization
     log = {"width shift": [],
@@ -237,16 +253,14 @@ def main():
            "center crop rate": [],
            "gaussian filter std": [],
            "gaussian filter rate": [],
-           "ACC": [],
-           "SNS": [],
-           "SPC": []}
+           "ACC": []}
 
     # 1. Baseline: no data augmentation
 
-    # Create ID-wise training / validation partitioning.
-    # Split data into train-, validation- and test-set.
-    partition = split_data(ids=list(labels.keys()), ratios={"train": train_ratio, "validation": validation_ratio,
-                                                            "test": test_ratio})
+    # Split performance data into train-, validation- and test-set
+    partition = split_data(ids=partition["performance"], ratios={"train": train_ratio, "validation": validation_ratio,
+                                                                 "test": test_ratio})
+    performance_no_da = {"ACC": [], "SNS": [], "SPC": []}
 
     # Load data:
     training_generator = DataGenerator(data_dir=data_dir,
@@ -301,25 +315,133 @@ def main():
 
     print("Test performance ACC:{}\t SNS:{}\t SPC:{}".format(test_acc, test_sns, test_spc))
 
-    # Logging baseline performance
-    log["width shift"].append(0)
-    log["height shift"].append(0)
-    log["rotation range"].append(0)
-    log["horizontal flip"].append(0)
-    log["vertical flip"].append(0)
-    log["min zoom"].append(0)
-    log["max zoom"].append(0)
-    log["random crop size"].append(0)
-    log["random crop rate"].append(0)
-    log["center crop size"].append(0)
-    log["center crop rate"].append(0)
-    log["gaussian filter std"].append(0)
-    log["gaussian filter rate"].append(0)
-    log["ACC"].append(test_acc)
-    log["SNS"].append(test_sns)
-    log["SPC"].append(test_spc)
+    performance_no_da["ACC"].append(test_acc)
+    performance_no_da["SNS"].append(test_sns)
+    performance_no_da["SPC"].append(test_spc)
 
-    # 2. Data augmentation
+    # Logging baseline performance
+    for i, value in enumerate(log.values()):
+        if i + 1 == len(log):
+            value.append(test_acc)
+        else:
+            value.append(0)
+
+    # Save performances
+    df = pd.DataFrame(performance_no_da)
+    df.to_csv(os.path.join(log_folder_path, os.path.join(experiment_id, "performance_no_da.csv")))
+
+    # 2. Bayesian optimization
+
+    # Define function to be optimized f(best_parameters) = accuracy
+    # TODO: Alternative partial function https://docs.python.org/2/library/functools.html
+    def black_box_function(width_shift,
+                           height_shift,
+                           rotation_range,
+                           horizontal_flip,
+                           vertical_flip,
+                           min_zoom,
+                           max_zoom,
+                           random_crop_size,
+                           random_crop_rate,
+                           center_crop_size,
+                           center_crop_rate,
+                           gaussian_filter_std,
+                           gaussian_filter_rate):
+
+        # Load data:
+        training_generator_opt = DataGenerator(data_dir=data_dir,
+                                               list_ids=partition_opt["train_opt"],
+                                               labels=labels,
+                                               batch_size=batch_size,
+                                               dim=dims[0:2],
+                                               n_channels=dims[-1],
+                                               n_classes=n_classes,
+                                               shuffle=False,
+                                               width_shift=width_shift,
+                                               height_shift=height_shift,
+                                               rotation_range=rotation_range,
+                                               horizontal_flip=horizontal_flip,
+                                               vertical_flip=vertical_flip,
+                                               min_zoom=min_zoom,
+                                               max_zoom=max_zoom,
+                                               random_crop_size=random_crop_size,
+                                               random_crop_rate=random_crop_rate,
+                                               center_crop_size=center_crop_size,
+                                               center_crop_rate=center_crop_rate,
+                                               gaussian_filter_std=gaussian_filter_std,
+                                               gaussian_filter_rate=gaussian_filter_rate)
+
+        validation_generator_opt = DataGenerator(data_dir=data_dir,
+                                                 list_ids=partition_opt["validation_opt"],
+                                                 labels=labels,
+                                                 batch_size=batch_size,
+                                                 dim=dims[0:2],
+                                                 n_channels=dims[-1],
+                                                 n_classes=n_classes,
+                                                 shuffle=False)
+
+        test_generator_opt = DataGenerator(data_dir=data_dir,
+                                           list_ids=partition_opt["test_opt"],
+                                           labels=labels,
+                                           batch_size=batch_size,
+                                           dim=dims[0:2],
+                                           n_channels=dims[-1],
+                                           n_classes=n_classes,
+                                           shuffle=False)
+
+        # Create/Compile CNN model
+        model_opt = create_2DCNN_model(dims, n_classes)
+
+        # CSVLogger: Logging epoch, acc, loss, val_acc, val_loss
+        csv_logger_opt = keras.callbacks.CSVLogger(
+            os.path.join(log_folder_path, os.path.join(
+                experiment_id, "training_opt_" + str(
+                    datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + ".csv")), append=False)
+
+        # Model checkpoint
+        model_checkpoint_opt = keras.callbacks.ModelCheckpoint(
+            path_model, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=True, mode='auto',
+            period=1)
+
+        # Train model:
+        train_2DCNN_model(generator=training_generator_opt, validation_data=validation_generator_opt,
+                          model=model_opt, epochs=num_epochs_da, callbacks=[model_checkpoint_opt, csv_logger_opt])
+
+        # Load models best weights
+        model_opt = create_2DCNN_model(dims, n_classes)
+        model_opt.load_weights(path_model)
+
+        val_acc = evaluate_2DCNN_model(generator=test_generator_opt, model=model_opt)
+        print(val_acc)
+
+        return val_acc[0]   # Return only acc for optimization
+
+    # Optimization
+    print("Starting optimization")
+    optimizer = BayesianOptimization(f=black_box_function, pbounds=bounds, verbose=2, random_state=1)
+    optimizer.maximize(init_points=n_random_exploration, n_iter=n_bayes, alpha=alpha, acq=acq, xi=xi)
+    best_parameters = optimizer.max["params"]
+
+    # Logging optimization performance
+    for res in optimizer.res:
+        log["ACC"].append(res["target"])
+        log["width shift"].append(res["params"]["width_shift"])
+        log["height shift"].append(res["params"]["height_shift"])
+        log["rotation range"].append(res["params"]["rotation_range"])
+        log["horizontal flip"].append(res["params"]["horizontal_flip"])
+        log["vertical flip"].append(res["params"]["vertical_flip"])
+        log["min zoom"].append(res["params"]["min_zoom"])
+        log["max zoom"].append(res["params"]["max_zoom"])
+        log["random crop size"].append(res["params"]["random_crop_size"])
+        log["random crop rate"].append(res["params"]["random_crop_rate"])
+        log["center crop size"].append(res["params"]["center_crop_size"])
+        log["center crop rate"].append(res["params"]["center_crop_rate"])
+        log["gaussian filter std"].append(res["params"]["gaussian_filter_std"])
+        log["gaussian filter rate"].append(res["params"]["gaussian_filter_rate"])
+
+    # 3. Testing: data augmentation with optimized (best) parameters
+
+    performance_da = {"ACC": [], "SNS": [], "SPC": []}
 
     # Load data:
     training_generator_da = DataGenerator(data_dir=data_dir,
@@ -330,7 +452,7 @@ def main():
                                           n_channels=dims[-1],
                                           n_classes=n_classes,
                                           shuffle=False,
-                                          **da_parameters)
+                                          **best_parameters)
 
     validation_generator_da = DataGenerator(data_dir=data_dir,
                                             list_ids=partition["validation"],
@@ -375,23 +497,29 @@ def main():
 
     print("Test da performance ACC:{}\t SNS:{}\t SPC:{}".format(test_acc, test_sns, test_spc))
 
-    # Logging augmentation performance
-    log["width shift"].append(da_parameters["width_shift"])
-    log["height shift"].append(da_parameters["height_shift"])
-    log["rotation range"].append(da_parameters["rotation_range"])
-    log["horizontal flip"].append(da_parameters["horizontal_flip"])
-    log["vertical flip"].append(da_parameters["vertical_flip"])
-    log["min zoom"].append(da_parameters["min_zoom"])
-    log["max zoom"].append(da_parameters["max_zoom"])
-    log["random crop size"].append(da_parameters["random_crop_size"])
-    log["random crop rate"].append(da_parameters["random_crop_rate"])
-    log["center crop size"].append(da_parameters["center_crop_size"])
-    log["center crop rate"].append(da_parameters["center_crop_rate"])
-    log["gaussian filter std"].append(da_parameters["gaussian_filter_std"])
-    log["gaussian filter rate"].append(da_parameters["gaussian_filter_rate"])
+    performance_da["ACC"].append(test_acc)
+    performance_da["SNS"].append(test_sns)
+    performance_da["SPC"].append(test_spc)
+
+    # Logging optimized augmentation performance
+    log["width shift"].append(best_parameters["width_shift"])
+    log["height shift"].append(best_parameters["height_shift"])
+    log["rotation range"].append(best_parameters["rotation_range"])
+    log["horizontal flip"].append(best_parameters["horizontal_flip"])
+    log["vertical flip"].append(best_parameters["vertical_flip"])
+    log["min zoom"].append(best_parameters["min_zoom"])
+    log["max zoom"].append(best_parameters["max_zoom"])
+    log["random crop size"].append(best_parameters["random_crop_size"])
+    log["random crop rate"].append(best_parameters["random_crop_rate"])
+    log["center crop size"].append(best_parameters["center_crop_size"])
+    log["center crop rate"].append(best_parameters["center_crop_rate"])
+    log["gaussian filter std"].append(best_parameters["gaussian_filter_std"])
+    log["gaussian filter rate"].append(best_parameters["gaussian_filter_rate"])
     log["ACC"].append(test_acc)
-    log["SNS"].append(test_sns)
-    log["SPC"].append(test_spc)
+
+    # Save performances
+    df = pd.DataFrame(performance_da)
+    df.to_csv(os.path.join(log_folder_path, os.path.join(experiment_id, "performance_da.csv")))
 
     # Make log table
     df = pd.DataFrame(log)
