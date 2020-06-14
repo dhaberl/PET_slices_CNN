@@ -4,4 +4,4 @@
 ## Branches
 master - Classification CNN without and with data augmentation (in order to compare the performance).
 
-BayesianOptimization - Classification CNN with a Bayesian optimization implemented in order to optimize augmentation parameters.
+BayesianOptimization - Classification CNN with Bayesian optimization implemented in order to optimize augmentation parameters.
