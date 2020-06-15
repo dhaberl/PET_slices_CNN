@@ -124,5 +124,5 @@ In the specified log directory a subfolder with the name of the experiment ID wi
 - train_vs_valid_da.csv: same of run with data augmentation
 
 ## Acknowledgments
-- [1] The code of the Data Generator is based on: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+- [1] The organization of the dataset and the code of the Data Generator is based on: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
 - [2] Bayesian optimization: https://github.com/fmfn/BayesianOptimization
