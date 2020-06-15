@@ -15,7 +15,7 @@ Classification CNN to predict colorectal cancer on PET slices in the transverse 
 
 ### Installation
 - Clone or download this repo
-- Install dependencies (see env_mnist2d_cnn.yml) and set up your environment
+- Install dependencies (see env_PET_slices_CNN.yml) and set up your environment
 
 ### Dataset
 A clinical dataset of 54 positive and 50 negative PET scans were used. 2D images were obtained by slicing the PET volumes into axial slices (512x512x1). 
