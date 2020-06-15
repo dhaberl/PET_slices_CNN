@@ -105,9 +105,9 @@ Output:
 
 In the specified log directory a subfolder with the name of the experiment ID will be created containing:
 - log_file.csv: contains all augmentation parameters and accuracy, sensitivity and specificity
-- train_vs_valid_no_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy
-- train_vs_valid_da.csv: same 
 - model_weights.h5: contains models weights of best performing model
+- train_vs_valid_no_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy
+- train_vs_valid_da.csv: same
 
 ## Acknowledgments
 - The code of the Data Generator is based on: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
