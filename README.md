@@ -15,7 +15,7 @@ Classification CNN to predict colorectal cancer on PET slices in the transverse 
 
 ### Installation
 - Clone or download this repo
-- Install dependencies (see env_mnist2d_cnn.yml) and set up your environment
+- Install dependencies (see env_PET_slices_CNN.yml) and set up your environment
 
 ### Dataset
 A clinical dataset of 54 positive and 50 negative PET scans were used. 2D images were obtained by slicing the PET volumes into axial slices (512x512x1). 
@@ -73,23 +73,33 @@ Define hyperparameters, e.g.:
 - batch_size = 32
 ```
 
-Define augmentation parameters, e.g.:
+Define Bayesian optimization parameters (see documentation [2]), e.g.:
 
 ```
-da_parameters = {"width_shift": 20.,
-                 "height_shift": 20.,
-                 "rotation_range": 20.,
-                 "horizontal_flip": 1.,
-                 "vertical_flip": 1.,
-                 "min_zoom": 0.5,
-                 "max_zoom": 1.5,
-                 "random_crop_size": 0.85,
-                 "random_crop_rate": 1.,
-                 "center_crop_size": 0.85,
-                 "center_crop_rate": 1.,
-                 "gaussian_filter_std": 2.,
-                 "gaussian_filter_rate": 1.
-                 }
+n_random_exploration = 2    # Number of random explorations; sampling of function
+n_bayes = 30                # Number of Bayesian optimizations steps
+alpha = 1                   # Handles the noise of the black box function; default: 1e-10.
+acq = "ei"                  # Select acquisition function: either "ucb" (default), "ei" or "poi".
+xi = 0.1                    # if acq == "ucb" use "kappa", else "xi". See Documentation.
+                            # "xi": prefer exploitation: 0.0, prefer exploration: 0.1
+```
+
+Define augmentation parameter range for Bayesian optimization, e.g.:
+
+```
+bounds = {"width_shift": (5, 20.),
+          "height_shift": (5, 20),
+          "rotation_range": (5, 20.),
+          "horizontal_flip": (1., 1.),
+          "vertical_flip": (1., 1.),
+          "min_zoom": (0.5, 1.),
+          "max_zoom": (1., 1.5),
+          "random_crop_size": (0.75, 1.),
+          "random_crop_rate": (1., 1.),
+          "center_crop_size": (0.75, 1.),
+          "center_crop_rate": (1., 1.),
+          "gaussian_filter_std": (0., 2.0),
+          "gaussian_filter_rate": (1., 1.)}
 ```
 
 Run:
@@ -104,10 +114,15 @@ python main.py -d 'data/' -i 'first_run' -l 'log/'
 Output:
 
 In the specified log directory a subfolder with the name of the experiment ID will be created containing:
-- log_file.csv: contains all augmentation parameters and accuracy, sensitivity and specificity
-- train_vs_valid_no_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy
-- train_vs_valid_da.csv: same 
+
+- log_file.csv: contains all augmentation parameters and accuracy
 - model_weights.h5: contains models weights of best performing model
+- performance_no_da.csv: contains accuracy, sensitivity, and specificity of run without data augmentation
+- performance_da.csv: same of run with data augmentation 
+- train_vs_valid_no_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy of run without data augmentation
+- train_opt_YYYY_MM_DD_HH_MM_SS.csv: same for current optimization step
+- train_vs_valid_da.csv: same of run with data augmentation
 
 ## Acknowledgments
-- The code of the Data Generator is based on: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+- [1] The code of the Data Generator is based on: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+- [2] Bayesian optimization: https://github.com/fmfn/BayesianOptimization
