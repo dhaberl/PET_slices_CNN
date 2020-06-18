@@ -179,7 +179,7 @@ def main():
     data_dir, experiment_id, log_folder_path = get_arguments()
 
     # Alternative: hard coded parameters
-    # data_dir = "data/slicew10px/Sliced_pet_tumyn_transversal"
+    # data_dir = "data/"
     # experiment_id = "run_1"
     # log_folder_path = "log"
 
