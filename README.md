@@ -1,4 +1,4 @@
-# Convolutional Neural Network in Keras/Tensorflow
+# 2D Convolutional Neural Network in Keras/Tensorflow
 Classification CNN to predict colorectal cancer on PET slices in the transverse plane using a custom Data Generator allowing real-time data feeding and data augmentation. This repo intends to evaluate whether image data augmentation can improve the prediction of colorectal cancer using CNNs.
 
 ## Prerequisites
