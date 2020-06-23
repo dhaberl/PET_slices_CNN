@@ -105,7 +105,7 @@ Output:
 
 In the specified log directory a subfolder with the name of the experiment ID will be created containing:
 - log_file.csv: contains all augmentation parameters and accuracy, sensitivity and specificity
-- model_weights.h5: contains models weights of best performing model
+- model_weights.h5: contains weights of the best performing model
 - train_vs_valid_no_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy of run without data augmentation
 - train_vs_valid_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy of run with data augmentation
 
