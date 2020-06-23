@@ -10,7 +10,7 @@ Classification CNN to predict colorectal cancer on PET slices in the transverse 
 ## Getting Started
 ### Branches
 - master - First, a CNN is trained and tested on the original images only acting as a baseline. Then, a new model is trained using image augmentations with handcrafted (empirical) augmentation parameters. 
-- BayesianOptimization - Same setup as master-branch but with a Bayesian optimization in order to evaluate if better parameters can be fined compared to the empirical approach.
+- BayesianOptimization - Same setup as master-branch but with a Bayesian optimization in order to evaluate if better parameters can be found compared to the empirical approach.
 
 
 ### Installation
