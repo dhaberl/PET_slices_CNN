@@ -118,10 +118,10 @@ In the specified log directory a subfolder with the name of the experiment ID wi
 - log_file.csv: contains all augmentation parameters and accuracy
 - model_weights.h5: contains models weights of best performing model
 - performance_no_da.csv: contains accuracy, sensitivity, and specificity of run without data augmentation
-- performance_da.csv: same of run with data augmentation 
+- performance_da.csv: contains accuracy, sensitivity, and specificity of run with data augmentation
 - train_vs_valid_no_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy of run without data augmentation
-- train_opt_YYYY_MM_DD_HH_MM_SS.csv: same for current optimization step
-- train_vs_valid_da.csv: same of run with data augmentation
+- train_opt_YYYY_MM_DD_HH_MM_SS.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy of current optimization step
+- train_vs_valid_da.csv: contains epoch, loss, sparse_categorical_accuracy, val_loss, val_sparse_categorical_accuracy of run with data augmentation
 
 ## Acknowledgments
 - [1] The organization of the dataset and the code of the Data Generator is based on: https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
