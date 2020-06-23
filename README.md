@@ -92,6 +92,21 @@ da_parameters = {"width_shift": 20.,
                  }
 ```
 
+Augmentations:
+- width_shift: Shifts are randomly sampled from [-width_shift, +width_shift].
+- height_shift: Shifts are randomly sampled from [-height_shift, +height_shift].
+- rotation_range: Degree range for random rotations. Randomly sampled from [-rotation_range, +rotation_range].
+- horizontal_flip: Probability rate for horizontal flips.
+- vertical_flip: Probability rate for vertical flips.
+- min_zoom: Lower limit for a random zoom.
+- max_zoom: Upper limit for a random zoom. The zoom factor is randomly sampled from [min_zoom, max_zoom].
+- random_crop_size: Fraction of the total width/height. The final crop is performed by randomly sampling a section from the original image.
+- random_crop_rate: Probability rate for random cropping.
+- center_crop_size: Fraction of the total width/height. The final crop is based on the center of the image.
+- center_crop_rate: Probability rate for centered cropping.
+- gaussian_filter_std: Images are blurred by a Gaussian function which is defined by its standard deviation (std). The std is randomly sampled from [0, gaussian_filter_std].
+- gaussian_filter_rate: Probability rate for gaussian filtering. 
+
 Run:
 ```
 python main.py -d 'data/' -i 'first_run' -l 'log/' 
